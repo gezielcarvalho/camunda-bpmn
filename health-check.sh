@@ -19,19 +19,18 @@ check_http() {
     fi
 }
 
-# Function to check Zeebe gRPC
+# Function to check Zeebe gRPC port
 check_zeebe() {
-    if docker run --rm --network host camunda/zbctl:8.6.3 --address localhost:26500 status > /dev/null 2>&1; then
-        echo "✅ Zeebe gRPC: OK"
+    if nc -zv localhost 26500 >/dev/null 2>&1; then
+        echo "✅ Zeebe gRPC (port 26500): OK"
     else
-        echo "❌ Zeebe gRPC: Not accessible"
+        echo "❌ Zeebe gRPC (port 26500): Not accessible"
     fi
 }
 
 # Check all services
-check_http "Operate" "http://localhost:8081/actuator/health"
-check_http "Tasklist" "http://localhost:8082/actuator/health" 
-check_http "Identity" "http://localhost:8084/auth/realms/camunda-platform/.well-known/openid_configuration"
+check_http "Operate" "http://localhost:8081/operate"
+check_http "Tasklist" "http://localhost:8082/tasklist" 
 check_http "Elasticsearch" "http://localhost:9200" "401"  # 401 because auth required
 check_zeebe
 

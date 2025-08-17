@@ -38,26 +38,42 @@ docker compose logs -f zeebe
 docker compose logs -f operate
 docker compose logs -f tasklist
 
-# Deploy a BPMN file with zbctl
-docker run --rm -it -v "$PWD/bpmn:/bpmn" --network host camunda/zbctl:8.6.3 \
-  --address localhost:26500 deploy /bpmn/your-process.bpmn
+# For zbctl commands, you need to install it separately or use Camunda Modeler
+# Alternatively, you can install zbctl:
+# wget https://github.com/camunda/zeebe/releases/download/8.6.3/zbctl
+# chmod +x zbctl && sudo mv zbctl /usr/local/bin/
 
-# Check Zeebe status
-docker run --rm -it --network host camunda/zbctl:8.6.3 \
-  --address localhost:26500 status
+# Check Zeebe port accessibility
+nc -zv localhost 26500
 ```
 
-## Access URLs
+## Access URLs (Development Mode - Local Authentication)
 
-- **Operate**: http://localhost:8081 (Process monitoring)
-- **Tasklist**: http://localhost:8082 (Human tasks)
-- **Identity**: http://localhost:8084 (Authentication)
+- **Operate**: http://localhost:8081/operate (Process monitoring)
+  - Username: `demo`
+  - Password: `demo`
+- **Tasklist**: http://localhost:8082/tasklist (Human tasks)
+  - Username: `demo`
+  - Password: `demo`
 - **Elasticsearch**: http://localhost:9200 (user: `elastic`, pass: `changeme`)
+- **Zeebe gRPC**: localhost:26500 (for Camunda Modeler and zbctl)
 
-## Default Credentials
+## Authentication (Optional)
 
-- **Admin User**: `admin` / `admin`
-- **Elasticsearch**: `elastic` / `changeme`
+By default, the stack runs without authentication for easy development. To enable authentication:
+
+```bash
+# Stop current services
+docker compose down
+
+# Start with authentication enabled
+docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d
+```
+
+**With authentication enabled:**
+
+- **Identity**: http://localhost:8084 (Authentication server)
+- **Default User**: `admin` / `admin`
 
 ## Development Workflow
 
