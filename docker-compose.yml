@@ -1,0 +1,146 @@
+version: "3.8"
+
+services:
+  # Zeebe - Workflow Engine
+  zeebe:
+    image: ${ZEEBE_IMAGE:-camunda/zeebe:8.6.3}
+    container_name: zeebe
+    ports:
+      - "26500:26500" # gRPC API
+      - "9600:9600" # Prometheus metrics
+    environment:
+      - ZEEBE_BROKER_EXPORTERS_ELASTICSEARCH_CLASSNAME=io.camunda.zeebe.exporter.ElasticsearchExporter
+      - ZEEBE_BROKER_EXPORTERS_ELASTICSEARCH_ARGS_URL=http://elasticsearch:9200
+      - ZEEBE_BROKER_EXPORTERS_ELASTICSEARCH_ARGS_BULK_SIZE=1
+      - ZEEBE_BROKER_EXPORTERS_ELASTICSEARCH_ARGS_AUTHENTICATION_USERNAME=elastic
+      - ZEEBE_BROKER_EXPORTERS_ELASTICSEARCH_ARGS_AUTHENTICATION_PASSWORD=${ELASTIC_PASSWORD}
+      - ZEEBE_BROKER_CLUSTER_PARTITIONS=${ZEEBE_BROKER_CLUSTER_PARTITIONS:-1}
+      - ZEEBE_BROKER_CLUSTER_REPLICATION_FACTOR=${ZEEBE_BROKER_CLUSTER_REPLICATION_FACTOR:-1}
+      - ZEEBE_BROKER_CLUSTER_CLUSTER_SIZE=${ZEEBE_BROKER_CLUSTER_CLUSTER_SIZE:-1}
+    depends_on:
+      - elasticsearch
+    volumes:
+      - zeebe-data:/usr/local/zeebe/data
+    networks:
+      - camunda-platform
+    restart: unless-stopped
+
+  # Elasticsearch - Data store for Operate and Tasklist
+  elasticsearch:
+    image: ${ELASTIC_IMAGE:-elasticsearch:8.12.2}
+    container_name: elasticsearch
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - xpack.security.authc.api_key.enabled=true
+      - xpack.monitoring.collection.enabled=true
+      - xpack.security.enrollment.enabled=true
+      - ES_JAVA_OPTS=${ES_JAVA_OPTS:--Xms1g -Xmx1g}
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+      - ./backups/es:/usr/share/elasticsearch/backup
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - camunda-platform
+    restart: unless-stopped
+
+  # Operate - Workflow Monitoring UI
+  operate:
+    image: ${OPERATE_IMAGE:-camunda/operate:8.6.3}
+    container_name: operate
+    ports:
+      - "8081:8080"
+    environment:
+      - CAMUNDA_OPERATE_ZEEBE_GATEWAYADDRESS=zeebe:26500
+      - CAMUNDA_OPERATE_ELASTICSEARCH_URL=http://elasticsearch:9200
+      - CAMUNDA_OPERATE_ELASTICSEARCH_USERNAME=elastic
+      - CAMUNDA_OPERATE_ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD}
+      - CAMUNDA_OPERATE_ZEEBEELASTICSEARCH_URL=http://elasticsearch:9200
+      - CAMUNDA_OPERATE_ZEEBEELASTICSEARCH_USERNAME=elastic
+      - CAMUNDA_OPERATE_ZEEBEELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD}
+      - SPRING_PROFILES_ACTIVE=identity-auth
+      - CAMUNDA_OPERATE_IDENTITY_ISSUER_URL=http://localhost:8084/auth/realms/camunda-platform
+      - CAMUNDA_OPERATE_IDENTITY_ISSUER_BACKEND_URL=http://identity:8080/auth/realms/camunda-platform
+      - CAMUNDA_OPERATE_IDENTITY_CLIENT_ID=operate
+      - CAMUNDA_OPERATE_IDENTITY_CLIENT_SECRET=${KEYCLOAK_INIT_OPERATE_SECRET}
+      - CAMUNDA_OPERATE_IDENTITY_AUDIENCE=operate-api
+    depends_on:
+      - zeebe
+      - elasticsearch
+      - identity
+    networks:
+      - camunda-platform
+    restart: unless-stopped
+
+  # Tasklist - Human Task Management UI
+  tasklist:
+    image: ${TASKLIST_IMAGE:-camunda/tasklist:8.6.3}
+    container_name: tasklist
+    ports:
+      - "8082:8080"
+    environment:
+      - CAMUNDA_TASKLIST_ZEEBE_GATEWAYADDRESS=zeebe:26500
+      - CAMUNDA_TASKLIST_ELASTICSEARCH_URL=http://elasticsearch:9200
+      - CAMUNDA_TASKLIST_ELASTICSEARCH_USERNAME=elastic
+      - CAMUNDA_TASKLIST_ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD}
+      - CAMUNDA_TASKLIST_ZEEBEELASTICSEARCH_URL=http://elasticsearch:9200
+      - CAMUNDA_TASKLIST_ZEEBEELASTICSEARCH_USERNAME=elastic
+      - CAMUNDA_TASKLIST_ZEEBEELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD}
+      - SPRING_PROFILES_ACTIVE=identity-auth
+      - CAMUNDA_TASKLIST_IDENTITY_ISSUER_URL=http://localhost:8084/auth/realms/camunda-platform
+      - CAMUNDA_TASKLIST_IDENTITY_ISSUER_BACKEND_URL=http://identity:8080/auth/realms/camunda-platform
+      - CAMUNDA_TASKLIST_IDENTITY_CLIENT_ID=tasklist
+      - CAMUNDA_TASKLIST_IDENTITY_CLIENT_SECRET=${KEYCLOAK_INIT_TASKLIST_SECRET}
+      - CAMUNDA_TASKLIST_IDENTITY_AUDIENCE=tasklist-api
+    depends_on:
+      - zeebe
+      - elasticsearch
+      - identity
+    networks:
+      - camunda-platform
+    restart: unless-stopped
+
+  # Identity - Authentication and Authorization
+  identity:
+    image: ${IDENTITY_IMAGE:-camunda/identity:8.6.3}
+    container_name: identity
+    ports:
+      - "8084:8080"
+    environment:
+      - KEYCLOAK_INIT_OPERATE_SECRET=${KEYCLOAK_INIT_OPERATE_SECRET}
+      - KEYCLOAK_INIT_OPERATE_ROOT_URL=${KEYCLOAK_INIT_OPERATE_ROOT_URL}
+      - KEYCLOAK_INIT_TASKLIST_SECRET=${KEYCLOAK_INIT_TASKLIST_SECRET}
+      - KEYCLOAK_INIT_TASKLIST_ROOT_URL=${KEYCLOAK_INIT_TASKLIST_ROOT_URL}
+      - KEYCLOAK_INIT_OPTIMIZE_SECRET=${KEYCLOAK_INIT_OPTIMIZE_SECRET}
+      - KEYCLOAK_INIT_OPTIMIZE_ROOT_URL=${KEYCLOAK_INIT_OPTIMIZE_ROOT_URL}
+      - KEYCLOAK_USERS_0_USERNAME=${IDP_ADMIN_USER}
+      - KEYCLOAK_USERS_0_PASSWORD=${IDP_ADMIN_PASSWORD}
+      - KEYCLOAK_USERS_0_FIRST_NAME=Demo
+      - KEYCLOAK_USERS_0_LAST_NAME=User
+      - KEYCLOAK_USERS_0_EMAIL=demo@camunda.com
+      - KEYCLOAK_USERS_0_ROLES_0=Identity
+      - KEYCLOAK_USERS_0_ROLES_1=Operate
+      - KEYCLOAK_USERS_0_ROLES_2=Tasklist
+      - KEYCLOAK_USERS_0_ROLES_3=Optimize
+    depends_on:
+      - elasticsearch
+    volumes:
+      - identity-data:/opt/bitnami/keycloak/data
+    networks:
+      - camunda-platform
+    restart: unless-stopped
+
+volumes:
+  zeebe-data:
+  elasticsearch-data:
+  identity-data:
+
+networks:
+  camunda-platform:
+    driver: bridge

@@ -1,0 +1,49 @@
+# Traefik Reverse Proxy Configuration (Optional)
+# This provides HTTPS termination and custom domains
+
+version: "3.8"
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=your-email@example.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    networks:
+      - camunda-platform
+      - traefik
+
+  # Example: Operate with custom domain
+  operate-proxy:
+    image: ${OPERATE_IMAGE:-camunda/operate:8.6.3}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.operate.rule=Host(`operate.example.com`)"
+      - "traefik.http.routers.operate.entrypoints=websecure"
+      - "traefik.http.routers.operate.tls.certresolver=letsencrypt"
+      - "traefik.http.services.operate.loadbalancer.server.port=8080"
+    # ... same environment as main compose file
+    networks:
+      - camunda-platform
+      - traefik
+
+networks:
+  traefik:
+    external: true
+  camunda-platform:
+    external: true

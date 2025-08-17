@@ -1,0 +1,26 @@
+# Docker Compose files
+docker-compose.override.yml
+
+# Environment file (contains secrets)
+.env
+
+# Local data directories
+data/
+logs/
+letsencrypt/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+
+# Temporary files
+tmp/
+temp/
