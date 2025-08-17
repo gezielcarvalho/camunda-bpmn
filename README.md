@@ -1,6 +1,14 @@
 # Camunda 8 on Docker — Self-Managed Stack
 
-Spin up a **Camunda 8** development environment locally using Docker Compose: **Zeebe** (workflow engine), **Operate**, **Tasklist**, **Identity** (OIDC), and **Elasticsearch**.
+Spin up a **Camunda 8** development environment loca## What's in `docker-compose.yml`?
+
+- Single-node **Zeebe** (1 partition) with **Elasticsearch exporter** enabled
+- **Elasticsearch** single node with security enabled
+- **Operate** and **Tasklist** with local authentication (demo user)
+- Persistent volumes for **Zeebe** and **Elasticsearch**
+- **Identity service disabled** for simplified development setup
+
+> For clarity, Zeebe's gRPC is exposed on `26500`, Operate on `8081`, Tasklist on `8082`.g Docker Compose: **Zeebe** (workflow engine), **Operate**, **Tasklist**, **Identity** (OIDC), and **Elasticsearch**.
 
 > This repo is optimized for **local dev & staging**. See the **Production Hardening** section before exposing anything to the internet.
 
@@ -9,10 +17,11 @@ Spin up a **Camunda 8** development environment locally using Docker Compose: **
 ## Stack
 
 - **Zeebe** – workflow engine (gRPC): `26500`
-- **Operate** – monitoring & troubleshooting UI: `8081`
-- **Tasklist** – human task UI: `8082`
-- **Identity** – authentication & OIDC provider: `8084`
+- **Operate** – monitoring & troubleshooting UI: `8081` (local auth: demo/demo)
+- **Tasklist** – human task UI: `8082` (local auth: demo/demo)
 - **Elasticsearch** – persistence for Operate/Tasklist: `9200`
+
+_Note: Identity service is disabled by default for easier development._
 
 ### High-level topology
 
@@ -20,7 +29,7 @@ Spin up a **Camunda 8** development environment locally using Docker Compose: **
 Clients (Modeler / Code)  ->  Zeebe (gRPC 26500)
 Operate UI (8081)         ->  Elasticsearch (9200)
 Tasklist UI (8082)        ->  Elasticsearch (9200)
-Identity (8084)           ->  Zeebe + Elasticsearch
+[Identity (8084) - Optional for production]
 ```
 
 ---
@@ -29,7 +38,7 @@ Identity (8084)           ->  Zeebe + Elasticsearch
 
 - Docker **24+** and **Docker Compose** plugin
 - 4+ GB RAM free (Elasticsearch is hungry)
-- Open local ports: **26500, 8081, 8082, 8084, 9200**
+- Open local ports: **26500, 8081, 8082, 9200**
 
 ---
 
@@ -66,9 +75,8 @@ docker compose ps
 
 3. **Open the apps**
 
-- **Operate**: [http://localhost:8081](http://localhost:8081)
-- **Tasklist**: [http://localhost:8082](http://localhost:8082)
-- **Identity**: [http://localhost:8084](http://localhost:8084)
+- **Operate**: [http://localhost:8081/operate](http://localhost:8081/operate) (user: `demo`, pass: `demo`)
+- **Tasklist**: [http://localhost:8082/tasklist](http://localhost:8082/tasklist) (user: `demo`, pass: `demo`)
 - **Elasticsearch** (secured): [http://localhost:9200](http://localhost:9200) (user: `elastic`, pass: from `.env`)
 
 > First boot can take a minute while Elasticsearch warms up and the apps initialize.
@@ -89,8 +97,7 @@ ELASTIC_IMAGE=elasticsearch:8.12.2
 
 # Dev credentials (CHANGE IN PROD)
 ELASTIC_PASSWORD=changeme
-IDP_ADMIN_USER=admin
-IDP_ADMIN_PASSWORD=admin
+# Note: Operate/Tasklist use local auth (demo/demo)
 ```
 
 ---
@@ -113,18 +120,20 @@ IDP_ADMIN_PASSWORD=admin
 1. Open your BPMN in Modeler.
 2. Set Zeebe connection to `localhost:26500`.
 3. Click **Deploy**, then **Start Instance**.
-4. Watch it in **Operate**; complete human tasks in **Tasklist**.
+4. Watch it in **Operate** (demo/demo); complete human tasks in **Tasklist** (demo/demo).
 
-**Option B – `zbctl` (inside a container)**
+**Option B – `zbctl` (manual installation required)**
 
 ```bash
+# Install zbctl first
+wget https://github.com/camunda/zeebe/releases/download/8.6.3/zbctl
+chmod +x zbctl && sudo mv zbctl /usr/local/bin/
+
 # Check gateway status
-docker run --rm -it --network host camunda/zbctl:8.6.3 \
-  --address 0.0.0.0:26500 status
+zbctl --address localhost:26500 status
 
 # Deploy a BPMN file from your current dir
-docker run --rm -it -v "$PWD:/bpmn" --network host camunda/zbctl:8.6.3 \
-  --address 0.0.0.0:26500 deploy /bpmn/your-process.bpmn
+zbctl --address localhost:26500 deploy bpmn/your-process.bpmn
 ```
 
 ---
@@ -141,12 +150,11 @@ docker compose down -v            # ⚠️ deletes data
 docker compose logs -f zeebe
 docker compose logs -f operate
 docker compose logs -f tasklist
-docker compose logs -f identity
 docker compose logs -f elasticsearch
 
 # Health checks
-curl -s http://localhost:8081/actuator/health
-curl -s http://localhost:8082/actuator/health
+curl -s http://localhost:8081/operate
+curl -s http://localhost:8082/tasklist
 curl -u elastic:$ELASTIC_PASSWORD http://localhost:9200
 ```
 
@@ -160,16 +168,15 @@ curl -u elastic:$ELASTIC_PASSWORD http://localhost:9200
 | ------------- | ---------------------- | ----------------------- |
 | Zeebe gRPC    | 26500:26500            | Clients & Modeler       |
 | Zeebe metrics | 9600:9600              | Prometheus scrape (opt) |
-| Operate       | 8081:8080              | Web UI                  |
-| Tasklist      | 8082:8080              | Web UI                  |
-| Identity      | 8084:8080              | IdP & admin             |
+| Operate       | 8081:8080              | Web UI (demo/demo)      |
+| Tasklist      | 8082:8080              | Web UI (demo/demo)      |
 | Elasticsearch | 9200:9200              | Secured; `elastic` user |
 
 ### Key environment variables (excerpt)
 
 - `ZEEBE_BROKER_CLUSTER_*` – partitions/replication/size (dev defaults: `1/1/1`)
 - `CAMUNDA_OPERATE_*` / `CAMUNDA_TASKLIST_*` – ES URL and Zeebe address
-- `IDENTITY_*` / `KEYCLOAK_INIT_*` – Identity configuration
+- `CAMUNDA_OPERATE_USER_*` / `CAMUNDA_TASKLIST_USER_*` – Local user configuration
 - `ELASTIC_PASSWORD` – sets the `elastic` superuser password
 
 ---
@@ -238,15 +245,16 @@ curl -u elastic:$ELASTIC_PASSWORD -X PUT "http://localhost:9200/_snapshot/es_loc
 
 ## Troubleshooting
 
-- **Operate/Tasklist show empty data**
+- **Operate/Tasklist login issues**
 
+  - Use credentials: `demo` / `demo` for both services.
   - Ensure Zeebe is exporting to Elasticsearch (exporter enabled in compose).
   - Check `OPERATE_ELASTICSEARCH_*` / `TASKLIST_ELASTICSEARCH_*`.
 
-- **Identity not reachable**
+- **Want to enable Identity/SSO?**
 
-  - Wait 30–60s on first boot.
-  - Check `docker compose logs -f identity`.
+  - Use the `docker-compose.auth.yml` overlay file.
+  - Run: `docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d`
 
 - **Elasticsearch refuses connections**
 
@@ -272,7 +280,7 @@ To serve `https://operate.example.com`, add a Traefik service and labels, termin
 A: This repo is for **Camunda 8** (Zeebe). Camunda 7 is the classic engine and not supported here.
 
 **Q: Can I skip Identity for dev?**
-A: Yes. You can run Operate/Tasklist without OIDC early on and enable Identity later.
+A: Yes. This setup runs **without Identity by default** for easier development. Enable it later with the auth overlay file.
 
 **Q: Where do I change versions?**
 A: Edit **`.env`** to pin image tags.

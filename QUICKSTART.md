@@ -58,22 +58,30 @@ nc -zv localhost 26500
 - **Elasticsearch**: http://localhost:9200 (user: `elastic`, pass: `changeme`)
 - **Zeebe gRPC**: localhost:26500 (for Camunda Modeler and zbctl)
 
-## Authentication (Optional)
+## Authentication
 
-By default, the stack runs without authentication for easy development. To enable authentication:
+The stack runs with **local authentication** using a demo user for easy development:
+
+- **Username**: `demo`
+- **Password**: `demo`
+
+### Optional: Enable Enterprise Identity/SSO
+
+For production-like authentication with Identity service:
 
 ```bash
 # Stop current services
 docker compose down
 
-# Start with authentication enabled
+# Start with full Identity/Keycloak authentication
 docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d
 ```
 
-**With authentication enabled:**
+**With Identity enabled:**
 
 - **Identity**: http://localhost:8084 (Authentication server)
 - **Default User**: `admin` / `admin`
+- Operate/Tasklist will redirect to Identity for SSO login
 
 ## Development Workflow
 
@@ -81,18 +89,22 @@ docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d
 2. Use Camunda Modeler to connect to `localhost:26500`
 3. Deploy and start process instances
 4. Monitor in Operate, complete tasks in Tasklist
+5. See `CREDENTIALS.md` for all login details
 
 ## Directory Structure
 
 ```
 .
-├── .env.example          # Environment configuration template
-├── .env                  # Your local configuration (created from example)
-├── docker-compose.yml    # Main service definitions
-├── start.sh             # Quick start script
-├── health-check.sh      # Service health checker
-├── bpmn/                # Place your BPMN files here
-├── backups/             # Elasticsearch snapshots
-├── init/                # Bootstrap scripts
-└── reverse-proxy/       # Optional proxy configuration
+├── .env.example            # Environment configuration template
+├── .env                    # Your local configuration (created from example)
+├── docker-compose.yml      # Main service definitions (local auth)
+├── docker-compose.auth.yml # Optional Identity/SSO overlay
+├── start.sh               # Quick start script
+├── health-check.sh        # Service health checker
+├── QUICKSTART.md          # This file
+├── CREDENTIALS.md         # Credentials reference
+├── bpmn/                  # Place your BPMN files here
+├── backups/               # Elasticsearch snapshots
+├── init/                  # Bootstrap scripts
+└── reverse-proxy/         # Optional proxy configuration
 ```
