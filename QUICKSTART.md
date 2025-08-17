@@ -79,9 +79,11 @@ docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d
 
 **With Identity enabled:**
 
-- **Identity**: http://localhost:8084 (Authentication server)
+- **Identity**: http://localhost:8084 (Authentication server) - _Only available with auth overlay_
 - **Default User**: `admin` / `admin`
 - Operate/Tasklist will redirect to Identity for SSO login
+
+⚠️ **Note**: Identity service is **disabled by default**. Port 8084 will be unreachable unless you enable the auth overlay.
 
 ## Development Workflow
 

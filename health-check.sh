@@ -41,3 +41,6 @@ docker compose ps
 echo ""
 echo "💡 If services show as unhealthy, wait a few minutes and try again."
 echo "📋 Check logs with: docker compose logs -f [service-name]"
+echo ""
+echo "ℹ️  Note: Identity service (port 8084) is disabled by default for development."
+echo "   Enable with: docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d"
