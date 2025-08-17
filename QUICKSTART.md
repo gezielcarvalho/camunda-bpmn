@@ -93,6 +93,16 @@ docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d
 4. Monitor in Operate, complete tasks in Tasklist
 5. See `CREDENTIALS.md` for all login details
 
+## 📚 **Learning Path**
+
+New to Camunda 8? Follow our structured learning path:
+
+1. **[Step 00: Environment Setup](docs/step-00-setup.md)** - Complete setup guide
+2. **[Step 01: Getting Started](docs/step-01-getting-started.md)** - Your first BPMN workflow
+3. **[More Steps](docs/README.md)** - Complete learning roadmap
+
+Perfect for beginners and experienced developers alike!
+
 ## Directory Structure
 
 ```
@@ -105,6 +115,10 @@ docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d
 ├── health-check.sh        # Service health checker
 ├── QUICKSTART.md          # This file
 ├── CREDENTIALS.md         # Credentials reference
+├── docs/                  # 📚 Learning path and tutorials
+│   ├── README.md          # Learning roadmap overview
+│   ├── step-00-setup.md   # Environment setup guide
+│   └── step-01-getting-started.md  # First workflow tutorial
 ├── bpmn/                  # Place your BPMN files here
 ├── backups/               # Elasticsearch snapshots
 ├── init/                  # Bootstrap scripts
