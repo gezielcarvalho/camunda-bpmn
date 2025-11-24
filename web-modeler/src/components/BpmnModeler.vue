@@ -17,7 +17,6 @@ import ZeebeModdle from "zeebe-bpmn-moddle/resources/zeebe";
 // Import BPMN.js styles
 import "bpmn-js/dist/assets/diagram-js.css";
 import "bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css";
-import "bpmn-js-properties-panel/dist/assets/properties-panel.css";
 
 const emit = defineEmits(["modeler-ready", "diagram-changed"]);
 
