@@ -1,14 +1,6 @@
 # Camunda 8 on Docker — Self-Managed Stack
 
-Spin up a **Camunda 8** development environment loca## What's in `docker-compose.yml`?
-
-- Single-node **Zeebe** (1 partition) with **Elasticsearch exporter** enabled
-- **Elasticsearch** single node with security enabled
-- **Operate** and **Tasklist** with local authentication (demo user)
-- Persistent volumes for **Zeebe** and **Elasticsearch**
-- **Identity service disabled** for simplified development setup
-
-> For clarity, Zeebe's gRPC is exposed on `26500`, Operate on `8081`, Tasklist on `8082`.g Docker Compose: **Zeebe** (workflow engine), **Operate**, **Tasklist**, **Identity** (OIDC), and **Elasticsearch**.
+Spin up a **Camunda 8** development environment locally using Docker Compose: **Zeebe** (workflow engine), **Operate**, **Tasklist**, and **Elasticsearch**.
 
 > This repo is optimized for **local dev & staging**. See the **Production Hardening** section before exposing anything to the internet.
 
@@ -46,11 +38,22 @@ Tasklist UI (8082)        ->  Elasticsearch (9200)
 
 ```
 .
-├─ .env.example          # Version pins & dev creds (copy to .env)
-├─ docker-compose.yml    # Core stack
-├─ reverse-proxy/        # (optional) Traefik/nginx config for TLS/hosts
-├─ init/                 # (optional) bootstrap scripts
-└─ backups/              # ES snapshots / volume backups
+├─ .env.example              # Version pins & dev creds (copy to .env)
+├─ docker-compose.yml        # Core stack with local authentication
+├─ docker-compose.auth.yml   # Optional Identity/SSO overlay
+├─ start.sh                  # Quick start script
+├─ health-check.sh           # Service health checker
+├─ QUICKSTART.md             # Quick reference guide
+├─ CREDENTIALS.md            # Credentials reference
+├─ bpmn/                     # BPMN workflow files
+│  └─ hello-world.bpmn       # Example workflow
+├─ docs/                     # Learning path tutorials
+│  ├─ README.md              # Learning roadmap
+│  ├─ step-00-setup.md       # Environment setup
+│  └─ step-01-getting-started.md  # First workflow tutorial
+├─ reverse-proxy/            # (optional) Traefik/nginx config for TLS/hosts
+├─ init/                     # Bootstrap scripts
+└─ backups/                  # ES snapshots / volume backups
 ```
 
 ---
@@ -60,8 +63,8 @@ Tasklist UI (8082)        ->  Elasticsearch (9200)
 1. **Clone & configure**
 
 ```bash
-git clone <this-repo-url> camunda-docker
-cd camunda-docker
+git clone https://github.com/gezielcarvalho/camunda-bpmn.git
+cd camunda-bpmn
 cp .env.example .env
 # (optional) change passwords, image tags, memory settings
 ```
@@ -69,6 +72,10 @@ cp .env.example .env
 2. **Launch the stack**
 
 ```bash
+# Using the quick start script (recommended)
+./start.sh
+
+# Or manually
 docker compose up -d
 docker compose ps
 ```
@@ -80,6 +87,12 @@ docker compose ps
 - **Elasticsearch** (secured): [http://localhost:9200](http://localhost:9200) (user: `elastic`, pass: from `.env`)
 
 > First boot can take a minute while Elasticsearch warms up and the apps initialize.
+
+4. **Check service health**
+
+```bash
+./health-check.sh
+```
 
 ---
 
@@ -102,39 +115,48 @@ ELASTIC_PASSWORD=changeme
 
 ---
 
-## What’s in `docker-compose.yml`?
+## What's in `docker-compose.yml`?
 
 - Single-node **Zeebe** (1 partition) with **Elasticsearch exporter** enabled
 - **Elasticsearch** single node with security enabled
-- **Operate**, **Tasklist**, **Identity** wired to Elasticsearch and Zeebe
-- Persistent volumes for **Zeebe** and **Elasticsearch**
+- **Operate** and **Tasklist** with local authentication (demo user)
+- Persistent volumes for **Zeebe**, **Elasticsearch**, and **Identity**
+- **Identity service disabled by default** for simplified development setup
+- **Backup directory** mounted for Elasticsearch snapshots
 
-> For clarity, Zeebe’s gRPC is exposed on `26500`, Operate on `8081`, Tasklist on `8082`, Identity on `8084`.
+> Zeebe's gRPC is exposed on `26500`, Operate on `8081`, Tasklist on `8082`.
+> Identity service (port `8084`) can be enabled with `docker-compose.auth.yml` overlay.
 
 ---
 
 ## First Workflow in 2 Minutes
 
-**Option A – Camunda Modeler**
+**Option A – Camunda Modeler (Recommended)**
 
-1. Open your BPMN in Modeler.
-2. Set Zeebe connection to `localhost:26500`.
-3. Click **Deploy**, then **Start Instance**.
-4. Watch it in **Operate** (demo/demo); complete human tasks in **Tasklist** (demo/demo).
+1. Download [Camunda Modeler](https://camunda.com/download/modeler/)
+2. Open the included example: `bpmn/hello-world.bpmn`
+3. Set Zeebe connection to `localhost:26500` (no authentication required)
+4. Click **Deploy**, then **Start Instance**
+5. Watch it in **Operate** (`demo`/`demo`); complete human tasks in **Tasklist** (`demo`/`demo`)
 
-**Option B – `zbctl` (manual installation required)**
+**Option B – `zbctl` (Command Line)**
 
 ```bash
-# Install zbctl first
+# Install zbctl
 wget https://github.com/camunda/zeebe/releases/download/8.6.3/zbctl
 chmod +x zbctl && sudo mv zbctl /usr/local/bin/
 
 # Check gateway status
 zbctl --address localhost:26500 status
 
-# Deploy a BPMN file from your current dir
-zbctl --address localhost:26500 deploy bpmn/your-process.bpmn
+# Deploy the example BPMN file
+zbctl --address localhost:26500 deploy bpmn/hello-world.bpmn
+
+# Start a process instance
+zbctl --address localhost:26500 create instance hello-world
 ```
+
+**See the tutorials** in `docs/` for step-by-step learning path.
 
 ---
 
@@ -142,9 +164,13 @@ zbctl --address localhost:26500 deploy bpmn/your-process.bpmn
 
 ```bash
 # Start / stop
-docker compose up -d
-docker compose down               # keep volumes
-docker compose down -v            # ⚠️ deletes data
+./start.sh                         # Quick start with setup
+docker compose up -d               # Start services
+docker compose down                # Stop (keep volumes)
+docker compose down -v             # ⚠️ deletes data
+
+# Health check
+./health-check.sh                  # Check all services
 
 # Logs
 docker compose logs -f zeebe
@@ -152,10 +178,14 @@ docker compose logs -f operate
 docker compose logs -f tasklist
 docker compose logs -f elasticsearch
 
-# Health checks
+# Service endpoints
 curl -s http://localhost:8081/operate
 curl -s http://localhost:8082/tasklist
-curl -u elastic:$ELASTIC_PASSWORD http://localhost:9200
+curl -u elastic:changeme http://localhost:9200
+nc -zv localhost 26500             # Test Zeebe gRPC port
+
+# Enable Identity/SSO (optional)
+docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d
 ```
 
 ---
@@ -174,10 +204,27 @@ curl -u elastic:$ELASTIC_PASSWORD http://localhost:9200
 
 ### Key environment variables (excerpt)
 
+- `ZEEBE_IMAGE`, `OPERATE_IMAGE`, `TASKLIST_IMAGE`, `IDENTITY_IMAGE`, `ELASTIC_IMAGE` – Container image versions
+- `ELASTIC_PASSWORD` – Elasticsearch password (default: `changeme`)
 - `ZEEBE_BROKER_CLUSTER_*` – partitions/replication/size (dev defaults: `1/1/1`)
+- `ES_JAVA_OPTS` – JVM options for Elasticsearch (default: `-Xms1g -Xmx1g`)
 - `CAMUNDA_OPERATE_*` / `CAMUNDA_TASKLIST_*` – ES URL and Zeebe address
-- `CAMUNDA_OPERATE_USER_*` / `CAMUNDA_TASKLIST_USER_*` – Local user configuration
-- `ELASTIC_PASSWORD` – sets the `elastic` superuser password
+- `CAMUNDA_OPERATE_USER_*` / `CAMUNDA_TASKLIST_USER_*` – Local user configuration (demo/demo)
+- `KEYCLOAK_*` – Identity/SSO configuration (when using auth overlay)
+
+All configurable in `.env` file (copy from `.env.example`).
+
+---
+
+## 📚 Learning Path
+
+New to Camunda 8? This repository includes a comprehensive learning path:
+
+- **[Step 00: Environment Setup](docs/step-00-setup.md)** - Complete setup and verification
+- **[Step 01: Getting Started](docs/step-01-getting-started.md)** - Your first BPMN workflow
+- **[Learning Roadmap](docs/README.md)** - Full learning path overview
+
+Perfect for beginners and experienced developers alike!
 
 ---
 
@@ -247,24 +294,34 @@ curl -u elastic:$ELASTIC_PASSWORD -X PUT "http://localhost:9200/_snapshot/es_loc
 
 - **Operate/Tasklist login issues**
 
-  - Use credentials: `demo` / `demo` for both services.
-  - Ensure Zeebe is exporting to Elasticsearch (exporter enabled in compose).
-  - Check `OPERATE_ELASTICSEARCH_*` / `TASKLIST_ELASTICSEARCH_*`.
+  - Use credentials: `demo` / `demo` for both services (see `CREDENTIALS.md`)
+  - Ensure Zeebe is exporting to Elasticsearch (exporter enabled in compose)
+  - Check `OPERATE_ELASTICSEARCH_*` / `TASKLIST_ELASTICSEARCH_*` environment variables
 
 - **Want to enable Identity/SSO?**
 
-  - Use the `docker-compose.auth.yml` overlay file.
-  - Run: `docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d`
+  - Identity service is disabled by default for simplified development
+  - Enable with overlay: `docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d`
+  - Access Identity at `http://localhost:8084` (user: `admin`, pass: `admin`)
 
 - **Elasticsearch refuses connections**
 
-  - Verify `ELASTIC_PASSWORD` matches across services.
-  - Ensure enough RAM; try `ES_JAVA_OPTS=-Xms1g -Xmx1g` (increase if you can).
+  - Verify `ELASTIC_PASSWORD` matches across services (default: `changeme`)
+  - Ensure enough RAM; try increasing `ES_JAVA_OPTS=-Xms2g -Xmx2g` in `.env`
+  - Check logs: `docker compose logs -f elasticsearch`
 
 - **Modeler cannot deploy**
 
-  - Confirm Zeebe at `localhost:26500`.
-  - Test with `zbctl ... status` (see commands above).
+  - Confirm Zeebe at `localhost:26500`
+  - Test with: `nc -zv localhost 26500`
+  - Or use `zbctl --address localhost:26500 status`
+
+- **Services won't start**
+
+  - Run health check: `./health-check.sh`
+  - Check Docker resources (4+ GB RAM required)
+  - Verify ports are not in use: `netstat -an | grep "26500\|8081\|8082\|9200"`
+  - Check logs: `docker compose logs`
 
 ---
 
@@ -277,22 +334,57 @@ To serve `https://operate.example.com`, add a Traefik service and labels, termin
 ## FAQ
 
 **Q: Camunda 7 or 8?**
-A: This repo is for **Camunda 8** (Zeebe). Camunda 7 is the classic engine and not supported here.
+A: This repo is for **Camunda 8** (Zeebe-based). Camunda 7 is the classic engine and not supported here.
 
 **Q: Can I skip Identity for dev?**
 A: Yes. This setup runs **without Identity by default** for easier development. Enable it later with the auth overlay file.
 
 **Q: Where do I change versions?**
-A: Edit **`.env`** to pin image tags.
+A: Edit **`.env`** to pin image tags. Copy from `.env.example` first.
+
+**Q: How do I backup my data?**
+A: Use Elasticsearch snapshots (see Backup & Restore section) and backup Zeebe volumes.
+
+**Q: What's the difference between this and Camunda Cloud?**
+A: This is self-managed/self-hosted. Camunda Cloud is the SaaS offering. This gives you full control over your infrastructure.
+
+**Q: Can I use this in Windows?**
+A: Yes! Use Docker Desktop for Windows. The scripts are bash-based, so use Git Bash or WSL.
+
+---
+
+## Additional Resources
+
+- **[QUICKSTART.md](QUICKSTART.md)** - Quick reference guide
+- **[CREDENTIALS.md](CREDENTIALS.md)** - All login credentials
+- **[Learning Path](docs/README.md)** - Structured tutorials
+- **[Camunda 8 Docs](https://docs.camunda.io/)** - Official documentation
+- **[BPMN 2.0 Reference](https://camunda.com/bpmn/)** - BPMN modeling guide
+- **[Camunda Forum](https://forum.camunda.io/)** - Community support
 
 ---
 
 ## License
 
-MIT (or your chosen license). See `LICENSE`.
+MIT License - See `LICENSE` file for details.
 
 ---
 
-## Credits
+## Contributing
 
-Camunda® is a registered trademark of Camunda Services GmbH. This project is a community setup for local/staging use.
+Contributions welcome! Feel free to:
+
+- Report issues
+- Submit pull requests
+- Suggest improvements
+- Share your workflows
+
+---
+
+## Credits & Acknowledgments
+
+Camunda® is a registered trademark of Camunda Services GmbH.
+
+This project is a community setup for local/staging use, created to help developers get started with Camunda 8 quickly and easily.
+
+**Repository**: [github.com/gezielcarvalho/camunda-bpmn](https://github.com/gezielcarvalho/camunda-bpmn)
