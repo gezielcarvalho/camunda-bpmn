@@ -1,0 +1,14 @@
+# Add Web Modeler service to existing stack
+services:
+  web-modeler:
+    build: ./web-modeler
+    container_name: web-modeler
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_ZEEBE_GATEWAY=http://zeebe:8080
+    depends_on:
+      - zeebe
+    networks:
+      - camunda-platform
+    restart: unless-stopped
