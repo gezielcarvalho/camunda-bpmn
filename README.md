@@ -11,6 +11,7 @@ Spin up a **Camunda 8** development environment locally using Docker Compose: **
 - **Zeebe** – workflow engine (gRPC): `26500`
 - **Operate** – monitoring & troubleshooting UI: `8081` (local auth: demo/demo)
 - **Tasklist** – human task UI: `8082` (local auth: demo/demo)
+- **Web Modeler** – visual BPMN editor: `3000` (optional)
 - **Elasticsearch** – persistence for Operate/Tasklist: `9200`
 
 _Note: Identity service is disabled by default for easier development._
@@ -18,7 +19,8 @@ _Note: Identity service is disabled by default for easier development._
 ### High-level topology
 
 ```
-Clients (Modeler / Code)  ->  Zeebe (gRPC 26500)
+Clients (Web Modeler / Desktop Modeler / Code)  ->  Zeebe (gRPC 26500)
+Web Modeler (3000)        ->  Zeebe (gRPC 26500)
 Operate UI (8081)         ->  Elasticsearch (9200)
 Tasklist UI (8082)        ->  Elasticsearch (9200)
 [Identity (8084) - Optional for production]
@@ -30,7 +32,8 @@ Tasklist UI (8082)        ->  Elasticsearch (9200)
 
 - Docker **24+** and **Docker Compose** plugin
 - 4+ GB RAM free (Elasticsearch is hungry)
-- Open local ports: **26500, 8081, 8082, 9200**
+- Open local ports: **26500, 3000, 8081, 8082, 9200**
+- (Optional) Node.js 20+ for local Web Modeler development
 
 ---
 
@@ -41,6 +44,7 @@ Tasklist UI (8082)        ->  Elasticsearch (9200)
 ├─ .env.example              # Version pins & dev creds (copy to .env)
 ├─ docker-compose.yml        # Core stack with local authentication
 ├─ docker-compose.auth.yml   # Optional Identity/SSO overlay
+├─ docker-compose.modeler.yml # Optional Web Modeler overlay
 ├─ start.sh                  # Quick start script
 ├─ health-check.sh           # Service health checker
 ├─ QUICKSTART.md             # Quick reference guide
@@ -50,7 +54,14 @@ Tasklist UI (8082)        ->  Elasticsearch (9200)
 ├─ docs/                     # Learning path tutorials
 │  ├─ README.md              # Learning roadmap
 │  ├─ step-00-setup.md       # Environment setup
-│  └─ step-01-getting-started.md  # First workflow tutorial
+│  ├─ step-01-getting-started.md  # First workflow tutorial
+│  ├─ step-02-first-workflow.md   # End-to-end workflow guide
+│  └─ web-modeler-quickstart.md   # Web Modeler guide
+├─ web-modeler/              # Web-based BPMN modeler (Vue.js)
+│  ├─ src/                   # Vue application source
+│  ├─ Dockerfile             # Docker build config
+│  ├─ package.json           # Dependencies
+│  └─ README.md              # Web Modeler documentation
 ├─ reverse-proxy/            # (optional) Traefik/nginx config for TLS/hosts
 ├─ init/                     # Bootstrap scripts
 └─ backups/                  # ES snapshots / volume backups
@@ -88,7 +99,21 @@ docker compose ps
 
 > First boot can take a minute while Elasticsearch warms up and the apps initialize.
 
-4. **Check service health**
+4. **(Optional) Start Web Modeler**
+
+```bash
+# Start with Web Modeler
+docker compose -f docker-compose.yml -f docker-compose.modeler.yml up -d
+
+# Or run locally for development
+cd web-modeler
+npm install
+npm run dev
+```
+
+- **Web Modeler**: [http://localhost:3000](http://localhost:3000)
+
+5. **Check service health**
 
 ```bash
 ./health-check.sh
@@ -131,7 +156,24 @@ ELASTIC_PASSWORD=changeme
 
 ## First Workflow in 2 Minutes
 
-**Option A – Camunda Modeler (Recommended)**
+**Option A – Web Modeler (Easiest)**
+
+1. Start Web Modeler:
+
+   ```bash
+   # With Docker
+   docker compose -f docker-compose.yml -f docker-compose.modeler.yml up -d
+
+   # Or locally
+   cd web-modeler && npm install && npm run dev
+   ```
+
+2. Open [http://localhost:3000](http://localhost:3000)
+3. Design your process using the visual editor
+4. Click **🚀 Deploy to Zeebe**
+5. Watch it in **Operate** (`demo`/`demo`); complete human tasks in **Tasklist** (`demo`/`demo`)
+
+**Option B – Desktop Modeler (Full-Featured)**
 
 1. Download [Camunda Modeler](https://camunda.com/download/modeler/)
 2. Open the included example: `bpmn/hello-world.bpmn`
@@ -139,7 +181,7 @@ ELASTIC_PASSWORD=changeme
 4. Click **Deploy**, then **Start Instance**
 5. Watch it in **Operate** (`demo`/`demo`); complete human tasks in **Tasklist** (`demo`/`demo`)
 
-**Option B – `zbctl` (Command Line)**
+**Option C – `zbctl` (Command Line)**
 
 ```bash
 # Install zbctl
@@ -169,6 +211,9 @@ docker compose up -d               # Start services
 docker compose down                # Stop (keep volumes)
 docker compose down -v             # ⚠️ deletes data
 
+# Start with Web Modeler
+docker compose -f docker-compose.yml -f docker-compose.modeler.yml up -d
+
 # Health check
 ./health-check.sh                  # Check all services
 
@@ -177,10 +222,12 @@ docker compose logs -f zeebe
 docker compose logs -f operate
 docker compose logs -f tasklist
 docker compose logs -f elasticsearch
+docker compose logs -f web-modeler # If using Web Modeler
 
 # Service endpoints
 curl -s http://localhost:8081/operate
 curl -s http://localhost:8082/tasklist
+curl -s http://localhost:3000      # Web Modeler
 curl -u elastic:changeme http://localhost:9200
 nc -zv localhost 26500             # Test Zeebe gRPC port
 
@@ -200,6 +247,7 @@ docker compose -f docker-compose.yml -f docker-compose.auth.yml up -d
 | Zeebe metrics | 9600:9600              | Prometheus scrape (opt) |
 | Operate       | 8081:8080              | Web UI (demo/demo)      |
 | Tasklist      | 8082:8080              | Web UI (demo/demo)      |
+| Web Modeler   | 3000:80                | BPMN editor (optional)  |
 | Elasticsearch | 9200:9200              | Secured; `elastic` user |
 
 ### Key environment variables (excerpt)
@@ -222,6 +270,8 @@ New to Camunda 8? This repository includes a comprehensive learning path:
 
 - **[Step 00: Environment Setup](docs/step-00-setup.md)** - Complete setup and verification
 - **[Step 01: Getting Started](docs/step-01-getting-started.md)** - Your first BPMN workflow
+- **[Step 02: First End-to-End Workflow](docs/step-02-first-workflow.md)** - Build a complete process
+- **[Web Modeler Quick Start](docs/web-modeler-quickstart.md)** - Use the web-based modeler
 - **[Learning Roadmap](docs/README.md)** - Full learning path overview
 
 Perfect for beginners and experienced developers alike!
@@ -351,6 +401,12 @@ A: This is self-managed/self-hosted. Camunda Cloud is the SaaS offering. This gi
 **Q: Can I use this in Windows?**
 A: Yes! Use Docker Desktop for Windows. The scripts are bash-based, so use Git Bash or WSL.
 
+**Q: Do I need to download Camunda Modeler?**
+A: No! This repo includes a **Web Modeler** (Vue.js-based) that runs in your browser. You can also download the desktop version if you prefer.
+
+**Q: How do I customize the Web Modeler?**
+A: The Web Modeler is a Vue.js application in `web-modeler/`. You can modify the code, add features, and extend it as needed. See `web-modeler/README.md` for details.
+
 ---
 
 ## Additional Resources
@@ -358,6 +414,7 @@ A: Yes! Use Docker Desktop for Windows. The scripts are bash-based, so use Git B
 - **[QUICKSTART.md](QUICKSTART.md)** - Quick reference guide
 - **[CREDENTIALS.md](CREDENTIALS.md)** - All login credentials
 - **[Learning Path](docs/README.md)** - Structured tutorials
+- **[Web Modeler Guide](web-modeler/README.md)** - Web Modeler documentation
 - **[Camunda 8 Docs](https://docs.camunda.io/)** - Official documentation
 - **[BPMN 2.0 Reference](https://camunda.com/bpmn/)** - BPMN modeling guide
 - **[Camunda Forum](https://forum.camunda.io/)** - Community support
