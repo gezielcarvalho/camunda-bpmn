@@ -2,6 +2,15 @@
 
 Welcome to the comprehensive Camunda 8 learning journey! This structured path will take you from setup to advanced workflow automation.
 
+## Project documentation
+
+The learning path below is complemented by concise project-governance documents:
+
+- [Project charter](project-charter.md) — portfolio purpose, scope, and boundaries
+- [Architecture](architecture.md) — current self-managed stack and modeler shape
+- [Delivery and quality](delivery-and-quality.md) — local/dev posture and production prerequisites
+- [Decision log](decision-log.md) — traceable operating decisions
+
 ## 🎯 **Learning Path Overview**
 
 ### **Phase 1: Foundation**
